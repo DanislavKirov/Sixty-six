@@ -1,8 +1,9 @@
 package deck_test
 
 import (
-	"Sixty-six/src"
 	"testing"
+
+	"github.com/DanislavKirov/Sixty-six/src/deck"
 )
 
 func TestShuffle(t *testing.T) {
