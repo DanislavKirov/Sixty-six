@@ -1,17 +1,15 @@
-package deck_test
+package deck
 
 import (
 	"testing"
-
-	"github.com/DanislavKirov/Sixty-six/src/deck"
 )
 
 func TestShuffle(t *testing.T) {
-	d := deck.New()
-	old := make([]string, deck.Size)
+	d := New()
+	old := make([]string, Size)
 	copy(old, d.Initial)
 	d.Shuffle()
-	for i := 0; i < deck.Size; i++ {
+	for i := 0; i < Size; i++ {
 		if old[i] != d.Initial[i] {
 			return
 		}
@@ -20,12 +18,16 @@ func TestShuffle(t *testing.T) {
 }
 
 func TestDrowCard(t *testing.T) {
-	d := deck.New()
+	d := New()
+	d.Shuffle()
 
-	for i := 0; i < deck.Size; i++ {
+	for i := 0; i < Size; i++ {
 		_, err := d.DrawCard()
 		if err != nil {
 			t.Error("Empty deck!")
+		}
+		if len(d.Initial) == len(d.Current) {
+			t.Error("Initial deck must not change!")
 		}
 	}
 

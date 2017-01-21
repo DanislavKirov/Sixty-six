@@ -22,7 +22,7 @@ type Deck struct {
 	Current []string
 }
 
-// New creates and returns a shuffled deck of cards.
+// New creates and returns an ordered deck of cards.
 func New() *Deck {
 	deck := new(Deck)
 	deck.Initial = make([]string, Size)
@@ -40,7 +40,7 @@ func New() *Deck {
 	return deck
 }
 
-// Shuffle takes a deck and returns a shuffled one with the same cards in it.
+// Shuffle takes a full deck and returns a shuffled one.
 func (d *Deck) Shuffle() {
 	res := make([]string, Size)
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -53,14 +53,24 @@ func (d *Deck) Shuffle() {
 	copy(d.Current, res)
 }
 
-// DrawCard takes a deck and returns the top card if it has any.
+// DrawCard returns the top card of the deck if it has any.
 func (d *Deck) DrawCard() (string, error) {
-	if len(d.Current) == 0 {
-		return "", errors.New("Empty deck")
+	card, err := d.DrawNcards(1)
+	if err != nil {
+		return "", err
+	}
+	return card[0], err
+}
+
+// DrawNcards returns the current deck and an error if n is bigger than the cards in the deck.
+// Otherwise it returns the top n cards.
+func (d *Deck) DrawNcards(n int) ([]string, error) {
+	if n > len(d.Current) {
+		d.Current = d.Current[len(d.Current)-1:]
+		return d.Current, errors.New("Not enough cards in deck")
 	}
 
-	card := d.Current[0]
-	d.Current = d.Current[1:]
-
-	return card, nil
+	cards := d.Current[:n]
+	d.Current = d.Current[n:]
+	return cards, nil
 }
