@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	suits  = [4]string{"Clubs", "Diamonds", "Hearts", "Spades"}
-	cards  = [6]string{"Nine", "Jack", "Queen", "King", "Ten", "Ace"}
+	//	suits  = [4]string{"Clubs", "Diamonds", "Hearts", "Spades"}
+	suits  = [4]string{"♣", "♦", "♥", "♠"}
+	cards  = [6]string{"9", "J", "Q", "K", "10", "A"}
 	points = [6]int{0, 2, 3, 4, 10, 11}
 )
 
@@ -29,7 +30,7 @@ func New() *Deck {
 	i := 0
 	for _, card := range cards {
 		for _, suit := range suits {
-			deck.Initial[i] = card + " of " + suit
+			deck.Initial[i] = card + suit
 			i++
 		}
 	}
