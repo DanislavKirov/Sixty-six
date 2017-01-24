@@ -4,17 +4,17 @@ package main
 
 import (
 	"fmt"
-	"net/http"
+	"log"
+	"net"
 	"strings"
 
 	"github.com/DanislavKirov/Sixty-six/cmd/deck"
-	"github.com/gorilla/websocket"
 )
 
 // game contains the connections and deck info.
 type game struct {
 	connectedPlayers int
-	players          [2]*websocket.Conn
+	players          [2]net.Conn
 	turn             int
 
 	deck  *deck.Deck
@@ -38,23 +38,9 @@ func (g *game) deal() {
 	g.turn = player2
 }
 
-var (
-	g = new(game)
-
-//	requests = []string{"connect", "card", "close", "change", "end"}
-)
-
-const (
-	player1     = 0
-	player2     = 1
-	connect     = "connect"
-	yourTurn    = "It's your turn, pick a card index: "
-	notYourTurn = "It's your opponent's turn, please wait."
-)
-
 // sendTo sends a message to player.
 func sendTo(player int, message string) {
-	g.players[player].WriteMessage(websocket.TextMessage, []byte(message))
+	g.players[player].Write([]byte(message))
 }
 
 // broadcast sends a message to both players.
@@ -76,7 +62,7 @@ func sendTurn() {
 }
 
 // playerConnected sends suitable message to the players when someone connects.
-func playerConnected(w http.ResponseWriter) {
+func playerConnected() {
 	if g.connectedPlayers == 1 {
 		sendTo(player1, "Waiting for the other player to connect.")
 	} else {
@@ -96,58 +82,69 @@ func startGame() {
 }
 
 func unexpectedExit() {
-	broadcast("Opponent left.")
 	g.players[player1].Close()
-	g.players[player2].Close()
+	if g.connectedPlayers == 2 {
+		broadcast("Opponent left.")
+		g.players[player2].Close()
+	}
 }
 
 func listenToPlayer(player int) {
+	p := make([]byte, 64)
 	for {
-		_, message, err := g.players[player].ReadMessage()
+		_, err := g.players[player].Read(p)
 		if err != nil {
 			fmt.Println(err.Error())
 			unexpectedExit()
 			return
 		}
-		m := string(message)
-		fmt.Println(m)
-		if len(m) == 2 && m[0] >= '1' && int(m[0]-'0') <= len(g.hands[player]) {
-			sendTo(1-player, "Opponent's card: "+g.hands[player][m[0]-'1'])
+		m := string(p)
+		cardIdx := int(m[0]-'0') - 1
+		if cardIdx >= 0 && cardIdx <= len(g.hands[player]) {
+			sendTo(1-player, "Opponent's card: "+g.hands[player][cardIdx])
 		} else {
 			sendTo(player, "wrong input, try again: ")
 		}
 	}
 }
 
-// handler handles the connections.
-func handler(w http.ResponseWriter, r *http.Request) {
-	if g.connectedPlayers < 2 {
-		var upgrader = websocket.Upgrader{
-			ReadBufferSize:  16,
-			WriteBufferSize: 16,
-		}
-		conn, _ := upgrader.Upgrade(w, r, nil)
+var (
+	g      = new(game)
+	server net.Listener
+)
 
-		_, p, _ := conn.ReadMessage()
-		message := string(p)
-		if message == connect {
+// startServer starts a server.
+func startServer() {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	server = l
+	//	defer l.Close()
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		p := make([]byte, 64)
+		_, e := conn.Read(p)
+		if e != nil {
+			log.Fatal(err)
+		}
+		if string(p[:7]) == Connect {
 			if g.connectedPlayers == 0 {
 				g.players[player1] = conn
 				go listenToPlayer(player1)
-			} else {
+			} else if g.connectedPlayers == 1 {
 				g.players[player2] = conn
 				go listenToPlayer(player2)
+			} else {
+				conn.Write([]byte("Already enough players."))
+				break
 			}
-			g.connectedPlayers++
-			playerConnected(w)
+			g.connectedPlayers += 1
+			playerConnected()
 		}
-	} else {
-		w.Write([]byte("Already enough players in this game."))
 	}
-}
-
-// main starts a server.
-func main() {
-	http.HandleFunc("/connect", handler)
-	http.ListenAndServe(":8081", nil)
 }
