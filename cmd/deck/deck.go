@@ -7,15 +7,32 @@ import (
 	"time"
 )
 
+// Size is the number of cards in a deck.
+const Size = 24
+
 var (
-	//	suits  = [4]string{"Clubs", "Diamonds", "Hearts", "Spades"}
 	suits  = [4]string{"♣", "♦", "♥", "♠"}
 	cards  = [6]string{"9", "J", "Q", "K", "10", "A"}
 	points = [6]int{0, 2, 3, 4, 10, 11}
 )
 
-// Size is the number of cards in a deck.
-const Size = 24
+var (
+	OrderedDeck []string
+	Points      map[byte]int
+)
+
+func init() {
+	OrderedDeck = make([]string, Size)
+	Points = make(map[byte]int)
+	i := 0
+	for idx, card := range cards {
+		for _, suit := range suits {
+			OrderedDeck[i] = card + suit
+			i++
+		}
+		Points[card[0]] = points[idx]
+	}
+}
 
 // Deck contains the original deck and the current one (after drawing cards).
 type Deck struct {
@@ -26,16 +43,10 @@ type Deck struct {
 // New creates and returns an ordered deck of cards.
 func New() *Deck {
 	deck := new(Deck)
-	deck.Initial = make([]string, Size)
-	i := 0
-	for _, card := range cards {
-		for _, suit := range suits {
-			deck.Initial[i] = card + suit
-			i++
-		}
-	}
 
+	deck.Initial = make([]string, Size)
 	deck.Current = make([]string, Size)
+	copy(deck.Initial, OrderedDeck)
 	copy(deck.Current, deck.Initial)
 
 	return deck
