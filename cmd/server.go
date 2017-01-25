@@ -7,66 +7,82 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/DanislavKirov/Sixty-six/cmd/deck"
 )
 
-// game contains the connections and deck info.
+// game contains the players' connections and deck info.
 type game struct {
 	connectedPlayers int
 	players          [2]net.Conn
-	turn             int
+	playerInTurn     int
 
-	deck  *deck.Deck
-	trump string
-	hands [2][]string
+	deck           *deck.Deck
+	hands          [2][]string
+	trump          string
+	isClosed       bool
+	playedCards    [2]string
+	emptyCardSlots [2]int
 
 	currentDealScore [2]int
 	gameScore        [2]int
 }
 
-// deal deals the first cards.
+// deal deals the first cards as if Player1 is the dealer.
 func (g *game) deal() {
-	g.hands[player1] = make([]string, 6)
-	g.hands[player2] = make([]string, 6)
+	g.hands[Player1] = make([]string, 6)
+	g.hands[Player2] = make([]string, 6)
 	hands, _ := g.deck.DrawNcards(13)
-	copy(g.hands[player2][:3], hands[:3]) // player1 deals, so player2 gets the first cards
-	copy(g.hands[player2][3:], hands[6:9])
-	copy(g.hands[player1][:3], hands[3:6])
-	copy(g.hands[player1][3:], hands[9:12])
+	copy(g.hands[Player2][:3], hands[:3])
+	copy(g.hands[Player2][3:], hands[6:9])
+	copy(g.hands[Player1][:3], hands[3:6])
+	copy(g.hands[Player1][3:], hands[9:12])
 	g.trump = hands[12]
-	g.turn = player2
+	g.playerInTurn = Player2
 }
 
-// sendTo sends a message to player.
+// getTrump returns suitable for sending string containing the trump.
+func (g *game) getTrump() string {
+	return Trump + g.trump + "\n"
+}
+
+// getHand returns suitable for sending string containing player's hand.
+func (g *game) getHand(player int) string {
+	return YourHand + strings.Join(g.hands[player], " ") + "\n"
+}
+
+// getPlayerNotInTurn returns the player who is waiting.
+func (g *game) getPlayerNotInTurn() int {
+	return 1 - g.playerInTurn
+}
+
+// sendTurnInfo sends info about hands, trump and turns to each player.
+func (g *game) sendTurnInfo() {
+	info := g.getHand(g.playerInTurn) + g.getTrump() + YourTurn
+	sendTo(g.playerInTurn, info)
+	info = g.getHand(g.getPlayerNotInTurn()) + g.getTrump() + NotYourTurn
+	sendTo(g.getPlayerNotInTurn(), info)
+}
+
+// sendTo sends message to player.
 func sendTo(player int, message string) {
 	g.players[player].Write([]byte(message))
 }
 
-// broadcast sends a message to both players.
+// broadcast sends message to both players.
 func broadcast(message string) {
-	sendTo(player1, message)
-	sendTo(player2, message)
-}
-
-func sendHands() {
-	hand := strings.Join(g.hands[player1], " ")
-	sendTo(player1, "Your hand: "+hand)
-	hand = strings.Join(g.hands[player2], " ")
-	sendTo(player2, "Your hand: "+hand)
-}
-
-func sendTurn() {
-	sendTo(g.turn, yourTurn)
-	sendTo(1-g.turn, notYourTurn)
+	sendTo(Player1, message)
+	sendTo(Player2, message)
 }
 
 // playerConnected sends suitable message to the players when someone connects.
+// Also starts the game when Player2 connects.
 func playerConnected() {
 	if g.connectedPlayers == 1 {
-		sendTo(player1, "Waiting for the other player to connect.")
+		sendTo(Player1, Waiting)
 	} else {
-		broadcast("The game starts now.")
+		broadcast(Start)
 		startGame()
 	}
 }
@@ -76,75 +92,167 @@ func startGame() {
 	g.deck = deck.New()
 	g.deck.Shuffle()
 	g.deal()
-	sendHands()
-	broadcast("Trump: " + g.trump)
-	sendTurn()
+	g.playerInTurn = Player2
+	g.sendTurnInfo()
 }
 
+// unexpectedExit informs players if someone quits and closes the connections.
 func unexpectedExit() {
-	g.players[player1].Close()
 	if g.connectedPlayers == 2 {
-		broadcast("Opponent left.")
-		g.players[player2].Close()
+		broadcast(OpponentLeft)
+		g.players[Player2].Close()
+	} else {
+		sendTo(Player1, OpponentLeft)
+	}
+	g.players[Player1].Close()
+	server.Close()
+}
+
+func isTrump(card string) bool {
+	//	fmt.Println(card[Suit], g.trump)
+	return card[Suit] == g.trump[Suit]
+}
+
+func areTheSameSuit() bool {
+	//	fmt.Println(g.playedCards[Player1], g.playedCards[Player2])
+	return g.playedCards[Player1][Suit] == g.playedCards[Player2][Suit]
+}
+
+func getTheOtherPlayer(player int) int {
+	return 1 - player
+}
+
+func findWinner() int {
+	if isTrump(g.playedCards[Player1]) && !isTrump(g.playedCards[Player2]) {
+		fmt.Println(1)
+		return Player1
+	}
+	if isTrump(g.playedCards[Player2]) && !isTrump(g.playedCards[Player1]) {
+		fmt.Println(2)
+		return Player2
+	}
+	if areTheSameSuit() {
+		if deck.Points[g.playedCards[Player1][Card]] > deck.Points[g.playedCards[Player2][Card]] {
+			fmt.Println(3)
+			return Player1
+		} else {
+			fmt.Println(4)
+			return Player2
+		}
+	}
+	fmt.Println(5)
+	return Player1
+}
+
+func drow() {
+	if len(g.deck.Current) == 0 || g.isClosed {
+		return
+	} else if len(g.deck.Current) == 1 {
+		g.hands[Player1][g.emptyCardSlots[Player1]], _ = g.deck.DrawCard()
+		g.hands[Player2][g.emptyCardSlots[Player2]] = g.trump
+	} else {
+		cards, _ := g.deck.DrawNcards(2)
+		g.hands[Player1][g.emptyCardSlots[Player1]] = cards[Player1]
+		g.hands[Player2][g.emptyCardSlots[Player2]] = cards[Player2]
 	}
 }
 
+// listenToPlayer listens what player sends.
 func listenToPlayer(player int) {
-	p := make([]byte, 64)
+	p := make([]byte, 128)
 	for {
 		_, err := g.players[player].Read(p)
 		if err != nil {
-			fmt.Println(err.Error())
 			unexpectedExit()
 			return
 		}
+
 		m := string(p)
-		cardIdx := int(m[0]-'0') - 1
-		if cardIdx >= 0 && cardIdx <= len(g.hands[player]) {
-			sendTo(1-player, "Opponent's card: "+g.hands[player][cardIdx])
-		} else {
-			sendTo(player, "wrong input, try again: ")
+		if m[0] >= '1' && m[0] <= '9' {
+			cardIdx := int(m[0] - '1')
+			if cardIdx >= len(g.hands[player]) || g.hands[player][cardIdx] == NoCard {
+				sendTo(player, WrongInput)
+				continue
+			} else {
+				card := g.hands[player][cardIdx]
+				g.playedCards[player] = card // + strconv.Itoa(cardIdx) // card + ?
+				g.hands[player][cardIdx] = NoCard
+				g.emptyCardSlots[player] = cardIdx
+				sendTo(g.getPlayerNotInTurn(), OpponentCard+card+"\n")
+			}
+
+			if g.playedCards[getTheOtherPlayer(player)] == NoCard {
+				g.playerInTurn = g.getPlayerNotInTurn()
+				sendTo(g.playerInTurn, YourTurn)
+			} else {
+				drow()
+				g.playerInTurn = findWinner()
+
+				sendTo(g.playerInTurn, Win)
+				sendTo(g.getPlayerNotInTurn(), Lose)
+
+				g.playedCards[Player1] = NoCard
+				g.playedCards[Player2] = NoCard
+
+				time.Sleep(1 * time.Second)
+				g.sendTurnInfo()
+			}
+			continue
+		}
+
+		fmt.Println(m)
+		switch m {
+		case Close:
+			g.isClosed = true
+			sendTo(g.getPlayerNotInTurn(), OpponentClosed)
+		case Quit:
+			unexpectedExit()
+			return
+		default:
+			sendTo(player, Unknown)
 		}
 	}
 }
 
 var (
-	g      = new(game)
 	server net.Listener
+	g      = new(game)
 )
 
-// startServer starts a server.
+// startServer starts a server and waits for two players to connect.
 func startServer() {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		log.Fatal(err)
 	}
 	server = l
-	//	defer l.Close()
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		p := make([]byte, 64)
-		_, e := conn.Read(p)
+		buff := make([]byte, 128)
+		_, e := conn.Read(buff)
 		if e != nil {
 			log.Fatal(err)
 		}
-		if string(p[:7]) == Connect {
+
+		if string(buff[:7]) == Connect {
 			if g.connectedPlayers == 0 {
-				g.players[player1] = conn
-				go listenToPlayer(player1)
+				g.players[Player1] = conn
+				go listenToPlayer(Player1)
 			} else if g.connectedPlayers == 1 {
-				g.players[player2] = conn
-				go listenToPlayer(player2)
+				g.players[Player2] = conn
+				go listenToPlayer(Player2)
 			} else {
-				conn.Write([]byte("Already enough players."))
+				conn.Write([]byte(EnoughPlayers))
 				break
 			}
 			g.connectedPlayers += 1
 			playerConnected()
+		} else {
+			conn.Write([]byte(Unknown))
 		}
 	}
 }

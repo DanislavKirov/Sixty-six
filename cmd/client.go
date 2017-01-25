@@ -16,7 +16,7 @@ func menu() {
 		fmt.Println("Pick one:\n1. Create game\n2. Join game\n")
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Something went wrong! Please try again.")
+			fmt.Println(TryAgain)
 		} else {
 			choice = int(input[0] - '0')
 		}
@@ -79,11 +79,11 @@ func client1() {
 }
 
 func client2() {
-	fmt.Println("Enter ip:port: ")
+	fmt.Print("Enter ip:port: ")
 	reader := bufio.NewReader(os.Stdin)
 	ip, err := reader.ReadString('\n')
 	for err != nil {
-		fmt.Println("Something went wrong! Please try again.")
+		fmt.Println(TryAgain)
 		ip, err = reader.ReadString('\n')
 	}
 	connect(ip[:len(ip)-1])
@@ -98,25 +98,30 @@ func connect(ip string) {
 
 	conn.Write([]byte(Connect))
 
-	p := make([]byte, 64)
+	p := make([]byte, 128)
 	reader := bufio.NewReader(os.Stdin)
+	var input string
 	for {
-		l, r := conn.Read(p)
-		if r != nil {
-			fmt.Println(r.Error())
+		size, err := conn.Read(p)
+		if err != nil {
+			fmt.Println(err.Error())
 			return
 		}
-		m := string(p)[:l]
-		fmt.Println(m)
-		if m == yourTurn || m == "wrong input, try again: " {
-			text, rr := reader.ReadString('\n')
-			for rr != nil {
-				fmt.Println("AGAIN: ")
-				text, rr = reader.ReadString('\n')
+		m := string(p)[:size]
+		fmt.Print(m)
+
+		if strings.Contains(m, YourTurn) || strings.Contains(m, WrongInput) {
+			input, err = reader.ReadString('\n')
+			for err != nil {
+				fmt.Println(TryAgain)
+				input, err = reader.ReadString('\n')
 			}
-			conn.Write([]byte(text))
+			conn.Write([]byte(input))
+			continue
 		}
-		if m == "Already enough players." {
+
+		switch m {
+		case EnoughPlayers, OpponentLeft:
 			return
 		}
 	}
