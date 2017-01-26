@@ -13,7 +13,7 @@ func menu() {
 	choice := 0
 	reader := bufio.NewReader(os.Stdin)
 	for choice != 1 && choice != 2 {
-		fmt.Println("Pick one:\n1. Create game\n2. Join game\n")
+		fmt.Print("Pick one:\n1. Create game\n2. Join game\nYour choise: ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(TryAgain)
@@ -110,14 +110,24 @@ func connect(ip string) {
 		m := string(p)[:size]
 		fmt.Print(m)
 
-		if strings.Contains(m, YourTurn) || strings.Contains(m, WrongInput) {
+		for strings.Contains(m, YourTurn) || m == WrongInput {
 			input, err = reader.ReadString('\n')
 			for err != nil {
 				fmt.Println(TryAgain)
 				input, err = reader.ReadString('\n')
 			}
-			conn.Write([]byte(input))
-			continue
+
+			if input[0] >= '1' && input[0] <= '6' {
+				conn.Write([]byte(input))
+			} else if strings.Contains(strings.ToLower(input), Close) {
+				conn.Write([]byte(Close))
+			} else if strings.Contains(strings.ToLower(input), Quit) {
+				conn.Write([]byte(Quit))
+			} else {
+				fmt.Print(WrongInput)
+				continue
+			}
+			break
 		}
 
 		switch m {
