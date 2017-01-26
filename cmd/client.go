@@ -123,6 +123,8 @@ func connect(ip string) {
 				conn.Write([]byte(Close))
 			} else if strings.Contains(strings.ToLower(input), Quit) {
 				conn.Write([]byte(Quit))
+			} else if strings.Contains(strings.ToLower(input), Exchange) {
+				conn.Write([]byte(strings.ToLower(input)))
 			} else {
 				fmt.Print(WrongInput)
 				continue
@@ -130,8 +132,7 @@ func connect(ip string) {
 			break
 		}
 
-		switch m {
-		case EnoughPlayers, OpponentLeft:
+		if m == EnoughPlayers || m == OpponentLeft {
 			return
 		}
 	}

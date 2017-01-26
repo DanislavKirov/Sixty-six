@@ -5,6 +5,7 @@ package main
 import (
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,11 +22,13 @@ type game struct {
 	hands          [2][]string
 	trump          string
 	isClosed       bool
-	playedCards    [2]string
+	trick          [2]string
+	hasTrickWon    [2]bool
+	marriages      [2]int
 	emptyCardSlots [2]int
 
-	currentDealScore [2]int
-	gameScore        [2]int
+	dealScore [2]int
+	gameScore [2]int
 }
 
 // deal deals the first cards as if Player1 is the dealer.
@@ -51,6 +54,10 @@ func (g *game) getHand(player int) string {
 	return YourHand + replaceTens(strings.Join(g.hands[player], " ")) + "\n"
 }
 
+func (g *game) getPoints(player int) string {
+	return "Your points: " + strconv.Itoa(g.dealScore[player]) + "\n"
+}
+
 // getPlayerNotInTurn returns the player who is waiting.
 func (g *game) getPlayerNotInTurn() int {
 	return 1 - g.playerInTurn
@@ -58,9 +65,9 @@ func (g *game) getPlayerNotInTurn() int {
 
 // sendTurnInfo sends info about hands, trump and turns to each player.
 func (g *game) sendTurnInfo() {
-	info := "\n" + g.getHand(g.playerInTurn) + g.getTrump() + YourTurn
+	info := "\n" + g.getHand(g.playerInTurn) + g.getTrump() + g.getPoints(g.playerInTurn) + YourTurn
 	sendTo(g.playerInTurn, info)
-	info = "\n" + g.getHand(g.getPlayerNotInTurn()) + g.getTrump() + NotYourTurn
+	info = "\n" + g.getHand(g.getPlayerNotInTurn()) + g.getTrump() + g.getPoints(g.getPlayerNotInTurn()) + NotYourTurn
 	sendTo(g.getPlayerNotInTurn(), info)
 }
 
@@ -115,28 +122,67 @@ func isTrump(card string) bool {
 	return card[Suit:] == g.trump[Suit:]
 }
 
-func areTheSameSuit() bool {
-	return g.playedCards[Player1][Suit:] == g.playedCards[Player2][Suit:]
+func areTheSameSuit(card1, card2 string) bool {
+	return card1[Suit:] == card2[Suit:]
 }
 
 func getTheOtherPlayer(player int) int {
 	return 1 - player
 }
 
+func checkForMarriageWith(rank byte, card string, player int) string {
+	for _, c := range g.hands[player] {
+		if c != NoCard && c[Rank] == rank && areTheSameSuit(c, card) {
+			if isTrump(card) {
+				return "40"
+			}
+			return "20"
+		}
+	}
+	return ""
+}
+
+func checkForMarriage(card string, player int) string {
+	if card[Rank] == 'Q' {
+		return checkForMarriageWith('K', card, player)
+	} else if card[Rank] == 'K' {
+		return checkForMarriageWith('Q', card, player)
+	}
+	return ""
+}
+
+func isPossibleExchange(player int) (bool, int) {
+	if g.trump[Rank] == '9' || !g.hasTrickWon[player] || g.isClosed || len(g.deck.Current) == 0 {
+		return false, -1
+	}
+
+	for idx, card := range g.hands[player] {
+		if isTrump(card) && card[Rank] == '9' {
+			return true, idx
+		}
+	}
+
+	return false, -1
+}
+
 func findWinner() int {
-	if isTrump(g.playedCards[Player1]) && !isTrump(g.playedCards[Player2]) {
+	if isTrump(g.trick[Player1]) && !isTrump(g.trick[Player2]) {
 		return Player1
 	}
-	if isTrump(g.playedCards[Player2]) && !isTrump(g.playedCards[Player1]) {
+	if isTrump(g.trick[Player2]) && !isTrump(g.trick[Player1]) {
 		return Player2
 	}
-	if areTheSameSuit() {
-		if deck.Points[g.playedCards[Player1][Card]] > deck.Points[g.playedCards[Player2][Card]] {
+	if areTheSameSuit(g.trick[Player1], g.trick[Player2]) {
+		if deck.Points[g.trick[Player1][Rank]] > deck.Points[g.trick[Player2][Rank]] {
 			return Player1
 		}
 		return Player2
 	}
 	return g.getPlayerNotInTurn()
+}
+
+func findPoints() int {
+	return deck.Points[g.trick[Player1][Rank]] + deck.Points[g.trick[Player2][Rank]]
 }
 
 func draw() {
@@ -170,31 +216,39 @@ func listenToPlayer(player int) {
 				continue
 			} else {
 				card := g.hands[player][cardIdx]
-				g.playedCards[player] = card
+				g.trick[player] = card
 				g.hands[player][cardIdx] = NoCard
 				g.emptyCardSlots[player] = cardIdx
-				sendTo(g.getPlayerNotInTurn(), OpponentCard+replaceTens(card)+"\n")
+				marriage := checkForMarriage(card, player)
+				if marriage != "" {
+					points, _ := strconv.Atoi(marriage)
+					g.marriages[player] += points
+				}
+				sendTo(g.getPlayerNotInTurn(), OpponentCard+replaceTens(card)+" "+marriage+"\n")
 			}
 
-			if g.playedCards[getTheOtherPlayer(player)] == NoCard {
+			if g.trick[getTheOtherPlayer(player)] == NoCard {
 				g.playerInTurn = g.getPlayerNotInTurn()
 				sendTo(g.playerInTurn, YourTurn)
 			} else {
 				draw()
 				g.playerInTurn = findWinner()
+				g.hasTrickWon[g.playerInTurn] = true
+				g.dealScore[g.playerInTurn] += g.marriages[g.playerInTurn] + findPoints()
+				g.marriages[g.playerInTurn] = 0
 
 				sendTo(g.playerInTurn, Win)
 				sendTo(g.getPlayerNotInTurn(), Lose)
 
-				g.playedCards[Player1] = NoCard
-				g.playedCards[Player2] = NoCard
+				g.trick[Player1] = NoCard
+				g.trick[Player2] = NoCard
 
 				time.Sleep(1 * time.Second)
 				g.sendTurnInfo()
 			}
 		} else if strings.Contains(m, Close) {
-			if g.isClosed {
-				sendTo(g.playerInTurn, AlreadyClosed)
+			if g.isClosed || len(g.deck.Current) < 2 {
+				sendTo(g.playerInTurn, NotPossible)
 			} else {
 				g.isClosed = true
 				sendTo(g.getPlayerNotInTurn(), OpponentClosed)
@@ -202,8 +256,16 @@ func listenToPlayer(player int) {
 			sendTo(g.playerInTurn, YourTurn)
 		} else if strings.Contains(m, Quit) {
 			unexpectedExit()
+		} else if strings.Contains(m, Exchange) && g.trick[g.getPlayerNotInTurn()] == NoCard {
+			if ok, idx := isPossibleExchange(player); ok {
+				g.hands[player][idx], g.trump = g.trump, g.hands[player][idx]
+				sendTo(g.getPlayerNotInTurn(), OpponentExchanged)
+				g.sendTurnInfo()
+			} else {
+				sendTo(player, NotPossible)
+			}
 		} else {
-			sendTo(player, Unknown)
+			sendTo(player, NotPossible)
 		}
 	}
 }
@@ -246,7 +308,7 @@ func startServer() {
 			g.connectedPlayers++
 			playerConnected()
 		} else {
-			conn.Write([]byte(Unknown))
+			conn.Write([]byte(NotPossible))
 		}
 	}
 }
