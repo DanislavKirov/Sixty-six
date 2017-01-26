@@ -12,15 +12,18 @@ const Size = 24
 
 var (
 	suits  = [4]string{"♣", "♦", "♥", "♠"}
-	cards  = [6]string{"9", "J", "Q", "K", "10", "A"}
+	cards  = [6]string{"9", "J", "Q", "K", "X", "A"} // X == 10
 	points = [6]int{0, 2, 3, 4, 10, 11}
 )
 
 var (
+	// OrderedDeck is the initial full ordered deck.
 	OrderedDeck []string
-	Points      map[byte]int
+	// Points is map connecting each card with its points.
+	Points map[byte]int
 )
 
+// init initializes the exported OrderedDeck and Points.
 func init() {
 	OrderedDeck = make([]string, Size)
 	Points = make(map[byte]int)
