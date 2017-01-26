@@ -7,29 +7,30 @@ const (
 	Player2 = 1
 
 	NoCard = ""
-	Card   = 0
+	Rank   = 0
 	Suit   = 1
 
 	// client -> server
-	Connect = "connect"
-	Close   = "close"
-	Quit    = "quit"
+	Connect  = "connect"
+	Exchange = "exchange"
+	Close    = "close"
+	Quit     = "quit"
 
 	// server -> client
-	Waiting        = "Waiting for the other player to connect.\n"
-	EnoughPlayers  = "Already enough players.\n"
-	Unknown        = "Unknown command.\n"
-	Start          = "The game starts now.\n\n"
-	YourTurn       = "It's your turn, pick a card number or write command: "
-	NotYourTurn    = "It's your opponent's turn, please wait.\n"
-	OpponentCard   = "Opponent's card: "
-	OpponentLeft   = "Opponent left.\n"
-	OpponentClosed = "Opponent closed.\n"
-	AlreadyClosed  = "Already closed.\n"
-	YourHand       = "Your hand: "
-	Trump          = "Trump: "
-	TryAgain       = "Something went wrong! Please try again."
-	WrongInput     = "Wrong input, try again: "
-	Win            = "You win.\n"
-	Lose           = "You lose.\n"
+	Waiting           = "Waiting for the other player to connect.\n"
+	EnoughPlayers     = "Already enough players.\n"
+	Start             = "The game starts now.\n\n"
+	YourTurn          = "It's your turn, pick a card number or write command: "
+	NotYourTurn       = "It's your opponent's turn, please wait.\n"
+	OpponentCard      = "Opponent's card: "
+	OpponentLeft      = "Opponent left.\n"
+	OpponentClosed    = "Opponent closed.\n"
+	OpponentExchanged = "Opponent exchanged the trump.\n"
+	YourHand          = "Your hand: "
+	Trump             = "Trump: "
+	TryAgain          = "Something went wrong! Please try again."
+	WrongInput        = "Wrong input, try again: "
+	Win               = "You win.\n"
+	Lose              = "You lose.\n"
+	NotPossible       = "Operation not possible.\n"
 )
