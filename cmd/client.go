@@ -98,7 +98,7 @@ func connect(ip string) {
 
 	conn.Write([]byte(Connect))
 
-	p := make([]byte, 128)
+	p := make([]byte, 256)
 	reader := bufio.NewReader(os.Stdin)
 	var input string
 	for {
@@ -110,7 +110,7 @@ func connect(ip string) {
 		m := string(p)[:size]
 		fmt.Print(m)
 
-		for strings.Contains(m, YourTurn) || m == WrongInput {
+		for strings.Contains(m, YourTurn) || m == WrongInput || m == NotPossible {
 			input, err = reader.ReadString('\n')
 			for err != nil {
 				fmt.Println(TryAgain)
@@ -119,16 +119,22 @@ func connect(ip string) {
 
 			if input[0] >= '1' && input[0] <= '6' {
 				conn.Write([]byte(input))
-			} else if strings.Contains(strings.ToLower(input), Close) {
+				break
+			}
+
+			input = strings.ToLower(input[:strings.Index(input, "\n")])
+			switch input {
+			case Close:
 				conn.Write([]byte(Close))
-			} else if strings.Contains(strings.ToLower(input), Quit) {
+			case Exchange:
+				conn.Write([]byte(Exchange))
+			case Quit:
 				conn.Write([]byte(Quit))
-			} else if strings.Contains(strings.ToLower(input), Exchange) {
-				conn.Write([]byte(strings.ToLower(input)))
-			} else {
+			default:
 				fmt.Print(WrongInput)
 				continue
 			}
+
 			break
 		}
 

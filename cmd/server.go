@@ -44,17 +44,17 @@ func (g *game) deal() {
 	g.playerInTurn = Player2
 }
 
-// getTrump returns suitable for sending string containing the trump.
-func (g *game) getTrump() string {
+// getTrumpMsg returns suitable for sending string containing the trump.
+func (g *game) getTrumpMsg() string {
 	return Trump + replaceTens(g.trump) + "\n"
 }
 
-// getHand returns suitable for sending string containing player's hand.
-func (g *game) getHand(player int) string {
+// getHandMsg returns suitable for sending string containing player's hand.
+func (g *game) getHandMsg(player int) string {
 	return YourHand + replaceTens(strings.Join(g.hands[player], " ")) + "\n"
 }
 
-func (g *game) getPoints(player int) string {
+func (g *game) getPointsMsg(player int) string {
 	return "Your points: " + strconv.Itoa(g.dealScore[player]) + "\n"
 }
 
@@ -65,9 +65,9 @@ func (g *game) getPlayerNotInTurn() int {
 
 // sendTurnInfo sends info about hands, trump and turns to each player.
 func (g *game) sendTurnInfo() {
-	info := "\n" + g.getHand(g.playerInTurn) + g.getTrump() + g.getPoints(g.playerInTurn) + YourTurn
+	info := "\n" + g.getHandMsg(g.playerInTurn) + g.getTrumpMsg() + g.getPointsMsg(g.playerInTurn) + YourTurn
 	sendTo(g.playerInTurn, info)
-	info = "\n" + g.getHand(g.getPlayerNotInTurn()) + g.getTrump() + g.getPoints(g.getPlayerNotInTurn()) + NotYourTurn
+	info = "\n" + g.getHandMsg(g.getPlayerNotInTurn()) + g.getTrumpMsg() + g.getPointsMsg(g.getPlayerNotInTurn()) + NotYourTurn
 	sendTo(g.getPlayerNotInTurn(), info)
 }
 
@@ -200,7 +200,7 @@ func draw() {
 
 // listenToPlayer listens what player sends.
 func listenToPlayer(player int) {
-	p := make([]byte, 128)
+	p := make([]byte, 256)
 	for {
 		_, err := g.players[player].Read(p)
 		if err != nil {
@@ -247,13 +247,13 @@ func listenToPlayer(player int) {
 				g.sendTurnInfo()
 			}
 		} else if strings.Contains(m, Close) {
-			if g.isClosed || len(g.deck.Current) < 2 {
+			if g.isClosed || len(g.deck.Current) < 2 || g.trick[g.getPlayerNotInTurn()] != NoCard {
 				sendTo(g.playerInTurn, NotPossible)
 			} else {
 				g.isClosed = true
 				sendTo(g.getPlayerNotInTurn(), OpponentClosed)
+				sendTo(g.playerInTurn, YourTurn)
 			}
-			sendTo(g.playerInTurn, YourTurn)
 		} else if strings.Contains(m, Quit) {
 			unexpectedExit()
 		} else if strings.Contains(m, Exchange) && g.trick[g.getPlayerNotInTurn()] == NoCard {
@@ -288,7 +288,7 @@ func startServer() {
 			log.Fatal(err)
 		}
 
-		buff := make([]byte, 128)
+		buff := make([]byte, 16)
 		_, e := conn.Read(buff)
 		if e != nil {
 			log.Fatal(err)

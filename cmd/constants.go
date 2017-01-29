@@ -32,5 +32,5 @@ const (
 	WrongInput        = "Wrong input, try again: "
 	Win               = "You win.\n"
 	Lose              = "You lose.\n"
-	NotPossible       = "Operation not possible.\n"
+	NotPossible       = "Operation not possible. Try something else: "
 )
