@@ -65,6 +65,9 @@ func (d *Deck) Shuffle() {
 	}
 
 	copy(d.Initial, res)
+	if len(d.Current) < Size {
+		d.Current = make([]string, Size)
+	}
 	copy(d.Current, res)
 }
 
