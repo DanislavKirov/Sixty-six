@@ -4,22 +4,24 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 )
 
+// menu connects the client depending on what he picks as option.
 func menu() {
 	choice := 0
 	reader := bufio.NewReader(os.Stdin)
 	for choice != 1 && choice != 2 {
-		fmt.Print("Pick one:\n1. Create game\n2. Join game\nYour choise: ")
+		fmt.Print("\nPick one:\n1. Create game\n2. Join game\nYour choise: ")
 		input, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println(TryAgain)
-		} else {
-			choice = int(input[0] - '0')
+		if err != nil || len(input) > 2 {
+			continue
 		}
+		choice = int(input[0] - '0')
 	}
 	if choice == 1 {
 		client1()
@@ -28,6 +30,7 @@ func menu() {
 	}
 }
 
+// externalIP finds the IP of the client creating the game.
 func externalIP() (string, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -65,19 +68,23 @@ func externalIP() (string, error) {
 	return "", errors.New("are you connected to the network?")
 }
 
+// client1 starts the server and connects to it.
 func client1() {
+	wg.Add(1)
 	go startServer()
 	ip, err := externalIP()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+	wg.Wait()
 	port := server.Addr().String()
 	idx := strings.LastIndex(port, ":")
-	fmt.Println(ip + port[idx:])
+	fmt.Println("IP:port = " + ip + port[idx:])
 	connect("localhost" + port[idx:])
 }
 
+// client2 connects to the server with given IP:port.
 func client2() {
 	fmt.Print("Enter ip:port: ")
 	reader := bufio.NewReader(os.Stdin)
@@ -89,6 +96,7 @@ func client2() {
 	connect(ip[:len(ip)-1])
 }
 
+// connect creates a client-server connection and communicates through it.
 func connect(ip string) {
 	conn, err := net.Dial("tcp", ip)
 	if err != nil {
@@ -104,7 +112,11 @@ func connect(ip string) {
 	for {
 		size, err := conn.Read(p)
 		if err != nil {
-			fmt.Println(err.Error())
+			if err == io.EOF {
+				fmt.Print(OpponentLeft)
+			} else {
+				fmt.Println(err.Error())
+			}
 			return
 		}
 		m := string(p)[:size]
@@ -117,7 +129,7 @@ func connect(ip string) {
 				input, err = reader.ReadString('\n')
 			}
 
-			if input[0] >= '1' && input[0] <= '6' {
+			if len(input) == 2 && input[0] >= '1' && input[0] <= '6' {
 				conn.Write([]byte(input))
 				break
 			}
@@ -128,8 +140,13 @@ func connect(ip string) {
 				conn.Write([]byte(Close))
 			case Exchange:
 				conn.Write([]byte(Exchange))
+			case Stop:
+				conn.Write([]byte(Stop))
+			case Help:
+				conn.Write([]byte(Help))
 			case Quit:
 				conn.Write([]byte(Quit))
+				return
 			default:
 				fmt.Print(WrongInput)
 				continue
@@ -138,12 +155,13 @@ func connect(ip string) {
 			break
 		}
 
-		if m == EnoughPlayers || m == OpponentLeft {
+		if m == OpponentLeft {
 			return
 		}
 	}
 }
 
+// main starts the game.
 func main() {
 	menu()
 }
