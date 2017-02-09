@@ -1,5 +1,3 @@
-// This file contains the messages needed for
-// the communication between the server and the clients.
 package main
 
 const (

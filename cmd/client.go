@@ -7,11 +7,10 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"strings"
 )
 
-// menu connects the client depending on what he picks as option.
+// menu connects the client depending on his choise.
 func menu() {
 	choice := 0
 	reader := bufio.NewReader(os.Stdin)
@@ -84,7 +83,7 @@ func client1() {
 	connect("localhost" + port[idx:])
 }
 
-// client2 connects to the server with given IP:port.
+// client2 connects to the server entering IP:port.
 func client2() {
 	fmt.Print("Enter ip:port: ")
 	reader := bufio.NewReader(os.Stdin)
