@@ -36,3 +36,28 @@ func TestDrowCard(t *testing.T) {
 		t.Error("Deck should be empty!")
 	}
 }
+
+func TestDrowNcards(t *testing.T) {
+	deck := New()
+	deck.Shuffle()
+
+	cards, err := deck.DrawNcards(Size / 2)
+	if err != nil || len(cards) != Size/2 {
+		t.Error("Deck should have enough cards!")
+	}
+
+	cards, err = deck.DrawNcards(Size/2 + 1)
+	if err == nil || len(cards) != 0 {
+		t.Error("Deck shouldn't have enough cards!")
+	}
+
+	cards, err = deck.DrawNcards(Size / 2)
+	if err != nil || len(cards) != Size/2 {
+		t.Error("Deck should have enough cards!")
+	}
+
+	cards, err = deck.DrawNcards(1)
+	if err == nil || len(cards) != 0 {
+		t.Error("Deck shouldn't have enough cards!")
+	}
+}
