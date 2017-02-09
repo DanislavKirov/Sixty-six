@@ -16,11 +16,11 @@ var (
 	points = [6]int{0, 2, 3, 4, 10, 11}
 )
 
+// OrderedDeck is the initial full ordered deck.
+// Points is map connecting each card with its points.
 var (
-	// OrderedDeck is the initial full ordered deck.
 	OrderedDeck []string
-	// Points is map connecting each card with its points.
-	Points map[byte]int
+	Points      map[byte]int
 )
 
 // init initializes the exported OrderedDeck and Points.
@@ -55,7 +55,7 @@ func New() *Deck {
 	return deck
 }
 
-// Shuffle takes a full deck and returns a shuffled one.
+// Shuffle shuffles the Initial deck and makes a copy of it in Current.
 func (d *Deck) Shuffle() {
 	res := make([]string, Size)
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -80,12 +80,10 @@ func (d *Deck) DrawCard() (string, error) {
 	return card[0], err
 }
 
-// DrawNcards returns the current deck and an error if n is bigger than the cards in the deck.
-// Otherwise it returns the top n cards.
+// DrawNcards returns the top n cards if n <= the size of the current deck.
 func (d *Deck) DrawNcards(n int) ([]string, error) {
 	if n > len(d.Current) {
-		d.Current = d.Current[len(d.Current)-1:]
-		return d.Current, errors.New("Not enough cards in deck")
+		return nil, errors.New("Not enough cards in deck")
 	}
 
 	cards := d.Current[:n]
