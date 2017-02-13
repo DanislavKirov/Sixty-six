@@ -1,5 +1,3 @@
-// This file contains the server of the game.
-// The server is responsible for making sure that the game is played by the rules.
 package main
 
 import (
@@ -33,8 +31,13 @@ type game struct {
 
 // getDeckInfoMsg returns suitable for sending string containing deck info.
 func (g *game) getDeckInfoMsg() string {
+	deckSize := len(g.deck.Current)
+	if deckSize != 0 {
+		deckSize++
+	}
+
 	return "Trump: " + replaceTens(g.trump) +
-		"\tDeck size: " + strconv.Itoa(len(g.deck.Current)+1) +
+		"\tDeck size: " + strconv.Itoa(deckSize) +
 		"\tClosed: " + strconv.FormatBool(g.isClosed()) + "\n"
 }
 
@@ -146,7 +149,7 @@ func areTheSameSuit(card1, card2 string) bool {
 	return card1[Suit:] == card2[Suit:]
 }
 
-// getTheOtherPlayer returns the player who is not 'player'.
+// getTheOtherPlayer returns the player who is not player.
 func getTheOtherPlayer(player int) int {
 	return 1 - player
 }
@@ -204,10 +207,23 @@ func hasSameSuitHigher(player int, card string) bool {
 	return false
 }
 
-// hasTrumps returns true if player has trumps.
-func hasTrumps(player int) bool {
-	for _, card := range g.hands[player] {
-		if isTrump(card) {
+func hasTrump(player int) bool {
+	for _, c := range g.hands[player] {
+		if isTrump(c) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasHigherTrump checks if playes has a trump with higher rank than card.
+func hasHigherTrump(player int, card1, card2 string) bool {
+	if isTrump(card1) && deck.Points[card1[Rank]] > deck.Points[card2[Rank]] {
+		return false
+	}
+
+	for _, c := range g.hands[player] {
+		if isTrump(c) && deck.Points[c[Rank]] > deck.Points[card2[Rank]] {
 			return true
 		}
 	}
@@ -218,9 +234,9 @@ func hasTrumps(player int) bool {
 func isGoodResponse(player int, card string) bool {
 	otherCard := g.trick[getTheOtherPlayer(player)]
 	if (g.isClosed() || len(g.deck.Current) == 0) &&
-		((areTheSameSuit(card, otherCard) && deck.Points[card[Rank]] < deck.Points[otherCard[Rank]] && hasSameSuitHigher(player, otherCard)) ||
-			(!areTheSameSuit(card, otherCard) && hasSameSuitHigher(player, otherCard)) ||
-			(!isTrump(card) && hasTrumps(player) && !hasSameSuitHigher(player, otherCard))) {
+		((hasSameSuitHigher(player, otherCard) && (!areTheSameSuit(card, otherCard) || deck.Points[card[Rank]] < deck.Points[otherCard[Rank]])) ||
+			(!hasSameSuitHigher(player, otherCard) && (!isTrump(otherCard) && !isTrump(card) && hasTrump(player)) ||
+				(isTrump(otherCard) && hasHigherTrump(player, card, otherCard)))) {
 		return false
 	}
 	return true
@@ -279,10 +295,10 @@ func findDealWinnerAndPoints(player, score1, score2 int) (int, int) {
 	if !g.hasTrickWon[player] {
 		return getTheOtherPlayer(player), 3
 	}
-	if score1 < 66 || score1 < score2 {
-		return getTheOtherPlayer(player), 2
+	if score1 >= 66 && score1 > score2 {
+		return player, findDealWinPointsAgainst(getTheOtherPlayer(player))
 	}
-	return player, findDealWinPointsAgainst(getTheOtherPlayer(player))
+	return getTheOtherPlayer(player), 2
 }
 
 // endDeal gives points to the winner and begins new deal if nobody has >= 11 points.
@@ -367,12 +383,13 @@ func listenToPlayer(player int) {
 				}
 			}
 
+			if g.hasTrickWon[player] {
+				g.dealScore[player] += g.marriages[player]
+				g.marriages[player] = 0
+			}
+
 			if g.trick[getTheOtherPlayer(player)] == NoCard {
 				sendTo(player, OpponentTurn)
-				if g.hasTrickWon[player] {
-					g.dealScore[player] += g.marriages[player]
-					g.marriages[player] = 0
-				}
 				g.playerInTurn = g.getPlayerNotInTurn()
 				sendTo(g.playerInTurn, YourTurn)
 			} else {
@@ -392,7 +409,6 @@ func listenToPlayer(player int) {
 					g.dealScore[g.playerInTurn] += LastTrickBonus
 					endDeal(Nobody)
 				} else {
-					// sort()
 					g.sendTurnInfo()
 				}
 			}
@@ -417,7 +433,11 @@ func listenToPlayer(player int) {
 				sendTo(player, NotPossible)
 			}
 		case Stop:
-			endDeal(player)
+			if g.trick[getTheOtherPlayer(player)] != NoCard {
+				sendTo(player, NotPossible)
+			} else {
+				endDeal(player)
+			}
 		case Help:
 			sendTo(player, Commands+YourTurn)
 		case Quit:
