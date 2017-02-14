@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -14,18 +15,22 @@ import (
 func menu() {
 	choice := 0
 	reader := bufio.NewReader(os.Stdin)
-	for choice != 1 && choice != 2 {
-		fmt.Print("\nPick one:\n1. Create game\n2. Join game\nYour choise: ")
+	for choice < 1 || choice > 3 {
+		fmt.Print("\nPick one:\n1. Create game\n2. Join game\n3. Single player\nYour choise: ")
 		input, err := reader.ReadString('\n')
 		if err != nil || len(input) > 2 {
 			continue
 		}
 		choice = int(input[0] - '0')
 	}
-	if choice == 1 {
+
+	switch choice {
+	case 1:
 		client1()
-	} else {
+	case 2:
 		client2()
+	case 3:
+		client3()
 	}
 }
 
@@ -67,7 +72,7 @@ func externalIP() (string, error) {
 	return "", errors.New("are you connected to the network?")
 }
 
-// client1 starts the server and connects to it.
+// client1 starts the server and connects the first player.
 func client1() {
 	wg.Add(1)
 	go startServer()
@@ -80,10 +85,11 @@ func client1() {
 	port := server.Addr().String()
 	idx := strings.LastIndex(port, ":")
 	fmt.Println("IP:port = " + ip + port[idx:])
-	connect("localhost" + port[idx:])
+	singlePlayer := false
+	connect("localhost"+port[idx:], singlePlayer)
 }
 
-// client2 connects to the server entering IP:port.
+// client2 connects the second player to the server entering IP:port.
 func client2() {
 	fmt.Print("Enter ip:port: ")
 	reader := bufio.NewReader(os.Stdin)
@@ -92,11 +98,64 @@ func client2() {
 		fmt.Println(TryAgain)
 		ip, err = reader.ReadString('\n')
 	}
-	connect(ip[:len(ip)-1])
+	singlePlayer := false
+	connect(ip[:len(ip)-1], singlePlayer)
+}
+
+// client3 starts the server, connects the player and creates a bot.
+func client3() {
+	wg.Add(1)
+	go startServer()
+	wg.Wait()
+	port := server.Addr().String()
+	idx := strings.LastIndex(port, ":")
+	ip := "localhost" + port[idx:]
+	wg.Add(1)
+	singlePlayer := true
+	go connect(ip, singlePlayer)
+	wg.Wait()
+	startBot(ip)
+}
+
+type bot struct {
+	cardToPlay int
+	points     int
+}
+
+// startBot creates and manages the bot.
+func startBot(ip string) {
+	conn, err := net.Dial("tcp", ip)
+	if err != nil {
+		fmt.Println(err.Error()) // kill the app? log.fatal?
+		return
+	}
+
+	conn.Write([]byte(Connect))
+	p := make([]byte, 256)
+	b := new(bot)
+
+	for {
+		size, err := conn.Read(p)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println(err.Error())
+			}
+			return
+		}
+		m := string(p)[:size]
+
+		if strings.Contains(m, YourTurn) {
+			b.cardToPlay = 0
+			conn.Write([]byte(strconv.Itoa(b.cardToPlay)))
+		} else if m == NotPossible || m == WrongInput {
+			b.cardToPlay++
+			conn.Write([]byte(strconv.Itoa(b.cardToPlay)))
+		}
+	}
 }
 
 // connect creates a client-server connection and communicates through it.
-func connect(ip string) {
+func connect(ip string, singlePlayer bool) {
 	conn, err := net.Dial("tcp", ip)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -108,6 +167,11 @@ func connect(ip string) {
 	p := make([]byte, 256)
 	reader := bufio.NewReader(os.Stdin)
 	var input string
+
+	if singlePlayer {
+		wg.Done()
+	}
+
 	for {
 		size, err := conn.Read(p)
 		if err != nil {
