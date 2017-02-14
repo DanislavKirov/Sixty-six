@@ -339,8 +339,20 @@ func endDeal(player int) {
 
 	g.gameScore[winner] += pts
 	ptsString := strconv.Itoa(pts) + "\n"
-	sendTo(winner, WonDeal+ptsString)
-	sendTo(getTheOtherPlayer(winner), LostDeal+ptsString)
+
+	pts1 := strconv.Itoa(score1)
+	pts2 := strconv.Itoa(score2)
+	var dealPts1, dealPts2 string
+	if winner == Player1 {
+		dealPts1 = pts1 + ":" + pts2 + " => "
+		dealPts2 = pts2 + ":" + pts1 + " => "
+	} else {
+		dealPts1 = pts2 + ":" + pts1 + " => "
+		dealPts2 = pts1 + ":" + pts2 + " => "
+	}
+
+	sendTo(winner, dealPts1+WonDeal+ptsString)
+	sendTo(getTheOtherPlayer(winner), dealPts2+LostDeal+ptsString)
 
 	if g.gameScore[winner] >= 11 {
 		sendTo(winner, WonGame)
@@ -416,7 +428,9 @@ func listenToPlayer(player int) {
 				g.trick[Player2] = NoCard
 
 				if len(g.hands[player]) == 0 {
-					g.dealScore[g.playerInTurn] += LastTrickBonus
+					if !g.isClosed() {
+						g.dealScore[g.playerInTurn] += LastTrickBonus
+					}
 					endDeal(Nobody)
 				} else {
 					g.sendTurnInfo()
