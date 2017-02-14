@@ -197,6 +197,16 @@ func isPossibleExchange(player int) (bool, int) {
 	return false, -1
 }
 
+// hasSameSuit returns true if player has a card from the same suit as cars.
+func hasSameSuit(player int, card string) bool {
+	for _, c := range g.hands[player] {
+		if areTheSameSuit(c, card) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasSameSuitHigher returns true if player has a better card to play.
 func hasSameSuitHigher(player int, card string) bool {
 	for _, c := range g.hands[player] {
@@ -207,6 +217,7 @@ func hasSameSuitHigher(player int, card string) bool {
 	return false
 }
 
+// hasTrump checks if playes has trumps.
 func hasTrump(player int) bool {
 	for _, c := range g.hands[player] {
 		if isTrump(c) {
@@ -234,9 +245,8 @@ func hasHigherTrump(player int, card1, card2 string) bool {
 func isGoodResponse(player int, card string) bool {
 	otherCard := g.trick[getTheOtherPlayer(player)]
 	if (g.isClosed() || len(g.deck.Current) == 0) &&
-		((hasSameSuitHigher(player, otherCard) && (!areTheSameSuit(card, otherCard) || deck.Points[card[Rank]] < deck.Points[otherCard[Rank]])) ||
-			(!hasSameSuitHigher(player, otherCard) && (!isTrump(otherCard) && !isTrump(card) && hasTrump(player)) ||
-				(isTrump(otherCard) && hasHigherTrump(player, card, otherCard)))) {
+		(!areTheSameSuit(card, otherCard) && (hasSameSuit(player, otherCard) || (!isTrump(otherCard) && !isTrump(card) && hasTrump(player))) ||
+			(areTheSameSuit(card, otherCard) && deck.Points[card[Rank]] < deck.Points[otherCard[Rank]] && hasSameSuitHigher(player, otherCard))) {
 		return false
 	}
 	return true
