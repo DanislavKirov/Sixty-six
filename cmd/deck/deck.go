@@ -1,4 +1,4 @@
-// Package deck provides api for creating and using a deck of cards.
+// Package deck provides api for creating and using a deck of 24 cards.
 package deck
 
 import (
@@ -17,7 +17,7 @@ var (
 )
 
 // OrderedDeck is the initial full ordered deck.
-// Points is map connecting each card with its points.
+// Points is a map connecting each card with its points.
 var (
 	OrderedDeck []string
 	Points      map[byte]int
@@ -89,4 +89,14 @@ func (d *Deck) DrawNcards(n int) ([]string, error) {
 	cards := d.Current[:n]
 	d.Current = d.Current[n:]
 	return cards, nil
+}
+
+// AreTheSameSuit returns true if card1 and card2 are from the same suit.
+func AreTheSameSuit(card1, card2 string) bool {
+	return card1[1:] == card2[1:]
+}
+
+// HasHigherRank returns true if the rank of card1 is higher than the rank of card2.
+func HasHigherRank(card1, card2 string) bool {
+	return Points[card1[0]] > Points[card2[0]]
 }
