@@ -17,7 +17,7 @@ func deckInfoMsg() string {
 
 // handMsg returns suitable for sending string containing player's hand.
 func handMsg(player int) string {
-	return YourHand + replaceTens(strings.Join(game.GetHand(player), " ")) + "\n"
+	return "Your hand: " + replaceTens(strings.Join(game.GetHand(player), " ")) + "\n"
 }
 
 // pointsMsg returns suitable for sending string containing deal and game points.

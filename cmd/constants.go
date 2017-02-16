@@ -12,6 +12,7 @@ const (
 	LastTrickBonus = 10
 
 	// client -> server
+
 	Connect  = "connect"
 	Exchange = "exchange"
 	Close    = "close"
@@ -20,6 +21,7 @@ const (
 	Quit     = "quit"
 
 	// server -> client
+
 	Waiting           = "Waiting for the other player to connect.\n"
 	Start             = "The game starts now.\n\n"
 	YourTurn          = "It's your turn, pick a card number (1-6) or write a command: "
