@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -85,8 +84,7 @@ func client1() {
 	port := server.Addr().String()
 	idx := strings.LastIndex(port, ":")
 	fmt.Println("IP:port = " + ip + port[idx:])
-	singlePlayer := false
-	connect("localhost"+port[idx:], singlePlayer)
+	connect("localhost"+port[idx:], false)
 }
 
 // client2 connects the second player to the server entering IP:port.
@@ -98,8 +96,7 @@ func client2() {
 		fmt.Println(TryAgain)
 		ip, err = reader.ReadString('\n')
 	}
-	singlePlayer := false
-	connect(ip[:len(ip)-1], singlePlayer)
+	connect(ip[:len(ip)-1], false)
 }
 
 // client3 starts the server, connects the player and creates a bot.
@@ -111,60 +108,22 @@ func client3() {
 	idx := strings.LastIndex(port, ":")
 	ip := "localhost" + port[idx:]
 	wg.Add(1)
-	singlePlayer := true
-	go connect(ip, singlePlayer)
+	go connect(ip, true)
 	wg.Wait()
 	startBot(ip)
 }
 
-type bot struct {
-	cardToPlay int
-	points     int
-}
-
-// startBot creates and manages the bot.
-func startBot(ip string) {
-	conn, err := net.Dial("tcp", ip)
-	if err != nil {
-		fmt.Println(err.Error()) // kill the app? log.fatal?
-		return
-	}
-
-	conn.Write([]byte(Connect))
-	p := make([]byte, 256)
-	b := new(bot)
-
-	for {
-		size, err := conn.Read(p)
-		if err != nil {
-			if err != io.EOF {
-				fmt.Println(err.Error())
-			}
-			return
-		}
-		m := string(p)[:size]
-
-		if strings.Contains(m, YourTurn) {
-			b.cardToPlay = 0
-			conn.Write([]byte(strconv.Itoa(b.cardToPlay)))
-		} else if m == NotPossible || m == WrongInput {
-			b.cardToPlay++
-			conn.Write([]byte(strconv.Itoa(b.cardToPlay)))
-		}
-	}
-}
-
 // connect creates a client-server connection and communicates through it.
 func connect(ip string, singlePlayer bool) {
-	conn, err := net.Dial("tcp", ip)
+	connection, err := net.Dial("tcp", ip)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
-	conn.Write([]byte(Connect))
+	connection.Write([]byte(Connect))
 
-	p := make([]byte, 256)
+	buff := make([]byte, 256)
 	reader := bufio.NewReader(os.Stdin)
 	var input string
 
@@ -173,7 +132,7 @@ func connect(ip string, singlePlayer bool) {
 	}
 
 	for {
-		size, err := conn.Read(p)
+		size, err := connection.Read(buff)
 		if err != nil {
 			if err == io.EOF {
 				fmt.Print(OpponentLeft)
@@ -182,10 +141,10 @@ func connect(ip string, singlePlayer bool) {
 			}
 			return
 		}
-		m := string(p)[:size]
-		fmt.Print(m)
+		message := string(buff)[:size]
+		fmt.Print(message)
 
-		for strings.Contains(m, YourTurn) || m == WrongInput || m == NotPossible {
+		for strings.Contains(message, YourTurn) || message == WrongInput || message == NotPossible {
 			input, err = reader.ReadString('\n')
 			for err != nil {
 				fmt.Println(TryAgain)
@@ -193,22 +152,22 @@ func connect(ip string, singlePlayer bool) {
 			}
 
 			if len(input) == 2 && input[0] >= '1' && input[0] <= '6' {
-				conn.Write([]byte(input))
+				connection.Write([]byte(input))
 				break
 			}
 
 			input = strings.ToLower(input[:strings.Index(input, "\n")])
 			switch input {
 			case Close:
-				conn.Write([]byte(Close))
+				connection.Write([]byte(Close))
 			case Exchange:
-				conn.Write([]byte(Exchange))
+				connection.Write([]byte(Exchange))
 			case Stop:
-				conn.Write([]byte(Stop))
+				connection.Write([]byte(Stop))
 			case Help:
-				conn.Write([]byte(Help))
+				connection.Write([]byte(Help))
 			case Quit:
-				conn.Write([]byte(Quit))
+				connection.Write([]byte(Quit))
 				return
 			default:
 				fmt.Print(WrongInput)
@@ -218,7 +177,7 @@ func connect(ip string, singlePlayer bool) {
 			break
 		}
 
-		if m == OpponentLeft {
+		if message == OpponentLeft {
 			return
 		}
 	}
