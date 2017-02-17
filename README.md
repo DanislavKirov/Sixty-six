@@ -5,7 +5,7 @@ The rules can be found [here] (https://en.wikipedia.org/wiki/Sixty-six_(card_gam
 
 ## Install
 
-`go get https://github.com/DanislavKirov/sixtySix/cmd`
+`go get github.com/DanislavKirov/sixtySix/cmd`
 
 ## Run
 
