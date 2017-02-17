@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-// menu connects the client depending on his choise.
+// menu connects the client depending on his choice.
 func menu() {
 	choice := 0
 	reader := bufio.NewReader(os.Stdin)
 	for choice < 1 || choice > 3 {
-		fmt.Print("\nPick one:\n1. Create game\n2. Join game\n3. Single player\nYour choise: ")
+		fmt.Print("\nPick one:\n1. Create game\n2. Join game\n3. Single player\nYour choice: ")
 		input, err := reader.ReadString('\n')
 		if err != nil || len(input) > 2 {
 			continue
@@ -33,8 +33,8 @@ func menu() {
 	}
 }
 
-// externalIP finds the IP of the client creating the game.
-func externalIP() (string, error) {
+// findIP finds the IP of the client creating the game.
+func findIP() (string, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "", err
@@ -68,16 +68,16 @@ func externalIP() (string, error) {
 			return ip.String(), nil
 		}
 	}
-	return "", errors.New("are you connected to the network?")
+	return "", errors.New("No network connection.")
 }
 
 // client1 starts the server and connects the first player.
 func client1() {
 	wg.Add(1)
 	go startServer()
-	ip, err := externalIP()
+	ip, err := findIP()
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		return
 	}
 	wg.Wait()
@@ -117,7 +117,7 @@ func client3() {
 func connect(ip string, singlePlayer bool) {
 	connection, err := net.Dial("tcp", ip)
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		return
 	}
 
@@ -137,7 +137,7 @@ func connect(ip string, singlePlayer bool) {
 			if err == io.EOF {
 				fmt.Print(OpponentLeft)
 			} else {
-				fmt.Println(err.Error())
+				fmt.Println(err)
 			}
 			return
 		}

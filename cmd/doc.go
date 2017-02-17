@@ -1,7 +1,7 @@
 /*
 Package main contains five files: game.go, server.go, client.go, bot.go, constants.go.
 
-game.go provides api for creating and managing a game of santase.
+game.go provides api for creating and managing a game of 66.
 
 server.go is responsible the communication between the players and manages the game.
 

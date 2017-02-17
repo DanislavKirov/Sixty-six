@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -10,34 +10,37 @@ import (
 
 // deckInfoMsg returns suitable for sending string containing deck info.
 func deckInfoMsg() string {
-	return "Trump: " + replaceTens(game.Trump()) +
-		"\tDeck size: " + strconv.Itoa(game.DeckSize()) +
-		"\tClosed: " + strconv.FormatBool(game.IsClosed()) + "\n"
+	deckSize := len(g.deck.Current)
+	if deckSize != 0 {
+		deckSize++ // counting the trump
+	}
+
+	return "Trump: " + replaceTens(g.trump) +
+		"\tDeck size: " + strconv.Itoa(deckSize) +
+		"\tClosed: " + strconv.FormatBool(g.isClosed()) + "\n"
 }
 
 // handMsg returns suitable for sending string containing player's hand.
 func handMsg(player int) string {
-	return "Your hand: " + replaceTens(strings.Join(game.GetHand(player), " ")) + "\n"
+	return "Your hand: " + replaceTens(strings.Join(g.hands[player], " ")) + "\n"
 }
 
-// pointsMsg returns suitable for sending string containing deal and game points.
+// pointsMsg returns suitable for sending string containing deal and g points.
 func pointsMsg(player int) string {
-	dealPts, gamePts1, gamePts2 := game.GetPoints(player)
-
-	return "Deal points: " + strconv.Itoa(dealPts) +
-		"\tGame points: " + strconv.Itoa(gamePts1) +
-		":" + strconv.Itoa(gamePts2) + "\n"
+	return "Deal points: " + strconv.Itoa(g.dealScore[player]) +
+		"\tGame points: " + strconv.Itoa(g.gameScore[player]) +
+		":" + strconv.Itoa(g.gameScore[opponentOf(player)]) + "\n"
 }
 
 // sendTurnInfo sends info about the deck, hands and points to each player.
 func sendTurnInfo() {
-	info := "\n" + handMsg(game.PlayerInTurn()) +
-		deckInfoMsg() + pointsMsg(game.PlayerInTurn()) + YourTurn
-	sendTo(game.PlayerInTurn(), info)
+	info := "\n" + handMsg(g.playerInTurn) +
+		deckInfoMsg() + pointsMsg(g.playerInTurn) + YourTurn
+	sendTo(g.playerInTurn, info)
 
-	info = "\n" + handMsg(game.PlayerNotInTurn()) +
-		deckInfoMsg() + pointsMsg(game.PlayerNotInTurn()) + OpponentTurn
-	sendTo(game.PlayerNotInTurn(), info)
+	info = "\n" + handMsg(g.playerNotInTurn()) +
+		deckInfoMsg() + pointsMsg(g.playerNotInTurn()) + OpponentTurn
+	sendTo(g.playerNotInTurn(), info)
 }
 
 // replaceTens gets a hand and replaces the tens to be suitable for printing.
@@ -54,7 +57,7 @@ func sendTo(player int, message string) {
 func exit(player int) {
 	if connected == 2 {
 		if player != Nobody {
-			sendTo(OpponentOf(player), OpponentLeft)
+			sendTo(opponentOf(player), OpponentLeft)
 		}
 		players[Player2].Close()
 	}
@@ -75,50 +78,51 @@ func listenTo(player int) {
 		m := string(buff)[:size]
 		if size == 2 && m[0] >= '1' && m[0] <= '6' {
 			cardIdx := int(m[0] - '1')
-			if !game.IsCardValid(player, cardIdx) {
+			if !g.isCardValid(player, cardIdx) {
 				sendTo(player, WrongInput)
 				continue
 			}
 
-			card := game.PlayerPlayed(player, cardIdx)
+			card := g.playerPlayed(player, cardIdx)
 			msg := OpponentCard + replaceTens(card)
 
-			hasMarriage, pts := game.CheckForMarriage(player, card)
+			hasMarriage, pts := g.checkForMarriage(player, card)
 			if hasMarriage {
-				game.AddMarriagePoints(player)
-				marriage := " Marriage: " + strconv.Itoa(pts) + "\n"
+				g.addMarriagePoints(player)
+				marriage := "Marriage: " + strconv.Itoa(pts) + "\n"
 				sendTo(player, marriage)
-				msg += marriage
+				msg += " " + marriage
 			} else {
 				msg += "\n"
 			}
-			sendTo(game.PlayerNotInTurn(), msg)
+			sendTo(g.playerNotInTurn(), msg)
 
-			if game.GetTrickCard(OpponentOf(player)) == NoCard {
+			if g.trick[opponentOf(player)] == NoCard {
 				sendTo(player, OpponentTurn)
-				game.NextPlayer()
-				sendTo(game.PlayerInTurn(), YourTurn)
+				g.playerInTurn = g.playerNotInTurn()
+				sendTo(g.playerInTurn, YourTurn)
 			} else {
-				winner := game.FindWinner()
-				game.MakePlayerInTurn(winner)
-				game.WinTrick(winner)
+				winner := g.findWinner()
+				g.playerInTurn = winner
+				g.hasTrickWon[winner] = true
 
-				game.AddMarriagePoints(winner)
-				game.AddPointsTo(winner, game.TrickPoints())
+				g.addMarriagePoints(winner)
+				g.dealScore[winner] += g.trickPoints()
 
-				sendTo(game.PlayerInTurn(), WonTrick)
-				sendTo(game.PlayerNotInTurn(), LostTrick)
-				game.ClearTable()
+				sendTo(g.playerInTurn, WonTrick)
+				sendTo(g.playerNotInTurn(), LostTrick)
+				g.trick[Player1] = NoCard
+				g.trick[Player2] = NoCard
 
-				game.Draw()
-				if game.IsHandEmpty() {
-					if !game.IsClosed() {
-						game.AddPointsTo(game.PlayerInTurn(), LastTrickBonus)
+				g.draw()
+				if len(g.hands[player]) == 0 {
+					if !g.isClosed() {
+						g.dealScore[g.playerInTurn] += LastTrickBonus
 					}
-					winner, pts := game.EndDeal(Nobody)
+					winner, pts := g.endDeal(Nobody)
 					ptsStr := strconv.Itoa(pts)
 					sendTo(winner, WonDeal+ptsStr+"\n")
-					sendTo(OpponentOf(winner), LostDeal+ptsStr+"\n")
+					sendTo(opponentOf(winner), LostDeal+ptsStr+"\n")
 					sendTurnInfo()
 				} else {
 					sendTurnInfo()
@@ -130,27 +134,27 @@ func listenTo(player int) {
 		var success bool
 		switch m {
 		case Close:
-			success = game.Close(player)
+			success = g.close(player)
 			if success {
-				sendTo(game.PlayerNotInTurn(), OpponentClosed)
+				sendTo(g.playerNotInTurn(), OpponentClosed)
 				sendTurnInfo()
 			} else {
-				sendTo(game.PlayerInTurn(), NotPossible)
+				sendTo(player, NotPossible)
 			}
 		case Exchange:
-			success = game.Exchange(player)
+			success = g.exchange(player)
 			if success {
-				sendTo(game.PlayerNotInTurn(), OpponentExchanged)
+				sendTo(g.playerNotInTurn(), OpponentExchanged)
 				sendTurnInfo()
 			} else {
 				sendTo(player, NotPossible)
 			}
 		case Stop:
-			success, winner, pts := game.Stop(player)
+			success, winner, pts := g.stop(player)
 			if success {
 				ptsStr := strconv.Itoa(pts) + "\n"
 				sendTo(winner, WonDeal+ptsStr)
-				sendTo(OpponentOf(winner), LostDeal+ptsStr)
+				sendTo(opponentOf(winner), LostDeal+ptsStr)
 				sendTurnInfo()
 			} else {
 				sendTo(player, NotPossible)
@@ -170,7 +174,7 @@ var (
 	err       error
 	wg        sync.WaitGroup
 	players   [2]net.Conn
-	game      = new(Game)
+	g         = new(game)
 	connected = 0
 )
 
@@ -178,20 +182,23 @@ var (
 func startServer() {
 	server, err = net.Listen("tcp", ":0")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	wg.Done()
 
 	for {
 		connection, err := server.Accept()
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			return
 		}
 
 		buff := make([]byte, 16)
 		size, e := connection.Read(buff)
 		if e != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			return
 		}
 
 		if string(buff[:size]) == Connect {
@@ -205,7 +212,7 @@ func startServer() {
 				go listenTo(Player2)
 				sendTo(Player1, Start)
 				sendTo(Player2, Start)
-				game.Start()
+				g.start()
 				sendTurnInfo()
 				break
 			}
