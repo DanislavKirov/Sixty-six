@@ -1,6 +1,6 @@
 package main
 
-import "github.com/DanislavKirov/Sixty-six/cmd/deck"
+import "github.com/DanislavKirov/sixtySix/cmd/deck"
 
 // game contains info about the deck and the current deal.
 type game struct {

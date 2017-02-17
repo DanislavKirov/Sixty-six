@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DanislavKirov/Sixty-six/cmd/deck"
+	"github.com/DanislavKirov/sixtySix/cmd/deck"
 )
 
 // pickCard returns index of card which can win the trick.
