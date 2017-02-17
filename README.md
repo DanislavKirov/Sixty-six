@@ -10,7 +10,7 @@ The rules can be found [here] (https://en.wikipedia.org/wiki/Sixty-six_(card_gam
 ## Run
 
 ```
-cd $GOPATH/src/github/DanislavKirov/sixtySix/cmd
+cd $GOPATH/src/github.com/DanislavKirov/sixtySix/cmd
 go build
 ./cmd
 ```
